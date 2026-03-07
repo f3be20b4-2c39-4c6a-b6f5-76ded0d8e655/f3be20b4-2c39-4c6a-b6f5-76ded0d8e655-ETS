@@ -20,6 +20,13 @@ const AppState = {
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('E.T.S Admin App Initializing...');
+    
+    // Check if device functions are available
+    if (typeof setDeviceCallbacks !== 'function') {
+        console.error('❌ device-functions.js failed to load');
+    } else {
+        console.log('✅ device-functions.js loaded successfully');
+    }
 
     // Set up device callbacks
     setDeviceCallbacks({
@@ -47,6 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
     addLog('System', '✅ E.T.S Admin App Started', 'System');
     addLog('System', `📱 Device: ${deviceInfo.platform}`, 'System');
     addLog('System', `🔌 Connection: ${deviceInfo.connected ? 'Connected' : 'Disconnected'}`, 'System');
+    if (deviceInfo.hasUSSD) addLog('System', '📞 USSD Support: Available', 'System');
+    if (deviceInfo.hasSMS) addLog('System', '💬 SMS Support: Available', 'System');
+    if (deviceInfo.hasCall) addLog('System', '☎️ Call Support: Available', 'System');
     addLog('System', '🚀 Ready for operations', 'System');
 
     console.log('E.T.S Admin App Initialized Successfully');

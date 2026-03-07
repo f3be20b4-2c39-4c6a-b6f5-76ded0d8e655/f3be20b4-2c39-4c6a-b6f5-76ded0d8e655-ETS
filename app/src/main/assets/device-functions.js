@@ -266,15 +266,35 @@ window.deviceHandleResult = function(message) {
 // INITIALIZE DEVICE FUNCTIONS
 // ============================================
 function initializeDeviceFunctions() {
-    checkDeviceConnection();
-    const info = getDeviceInfo();
-    console.log('Device Functions Initialized:', info);
-    return info;
+    // Wait a bit for Android bridge to be injected
+    let bridgeCheckCount = 0;
+    const checkBridge = () => {
+        bridgeCheckCount++;
+        if (window.AndroidUSSD) {
+            checkDeviceConnection();
+            const info = getDeviceInfo();
+            console.log('✅ Device Functions Initialized:', info);
+            console.log('Available methods:', {
+                runUssd: typeof window.AndroidUSSD.runUssd,
+                sendSms: typeof window.AndroidUSSD.sendSms,
+                makeCall: typeof window.AndroidUSSD.makeCall,
+                readSms: typeof window.AndroidUSSD.readSms
+            });
+            return true;
+        } else if (bridgeCheckCount < 50) {
+            // Wait up to 5 seconds (50 checks × 100ms)
+            setTimeout(checkBridge, 100);
+        } else {
+            console.warn('❌ Android bridge not available after timeout');
+        }
+    };
+    checkBridge();
 }
 
 // Auto-initialize when script loads
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeDeviceFunctions);
 } else {
-    initializeDeviceFunctions();
+    // Delay execution to ensure Android bridge is injected first
+    setTimeout(initializeDeviceFunctions, 500);
 }

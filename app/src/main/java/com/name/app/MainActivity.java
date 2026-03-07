@@ -1,4 +1,4 @@
-package com.example.ussdwebview;
+package com.name.app;
 
 import android.Manifest;
 import android.app.NotificationChannel;
@@ -72,7 +72,10 @@ public class MainActivity extends AppCompatActivity {
 
         webView.addJavascriptInterface(new JSBridge(), "AndroidUSSD");
 
-        webView.loadUrl("file:///android_asset/index.html");
+        // Load with delay to ensure bridge is ready
+        webView.post(() -> {
+            webView.loadUrl("file:///android_asset/index.html");
+        });
     }
 
     private void createNotificationChannel() {
@@ -128,6 +131,11 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void readSms() {
             runOnUiThread(() -> executeReadSMS());
+        }
+
+        @JavascriptInterface
+        public void makeCall(String phoneNumber) {
+            runOnUiThread(() -> executeMakeCall(phoneNumber));
         }
     }
 
@@ -231,6 +239,28 @@ public class MainActivity extends AppCompatActivity {
     private boolean hasSmsPermissions() {
         return ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
                ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void executeMakeCall(String phoneNumber) {
+        if (!hasCallPermissions()) {
+            requestAllPermissions();
+            return;
+        }
+
+        try {
+            Intent callIntent = new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + phoneNumber));
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                startActivity(callIntent);
+                sendResultToWeb("Call initiated to: " + phoneNumber);
+            }
+        } catch (Exception e) {
+            sendResultToWeb("Call failed: " + e.getMessage());
+        }
+    }
+
+    private boolean hasCallPermissions() {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED &&
+               ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED;
     }
 
     private boolean hasAllPermissions() {
