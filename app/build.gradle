@@ -2,17 +2,15 @@ import java.util.Properties
 
 apply plugin: 'com.android.application'
 
-// ===== Manual Configuration =====
 def packageName = "com.erandix.auto"
 def appName = "E.T.S"
 def appCode = 1
 def appVersion = "1"
-def sdkMin = 19         // Minimum API 19 (Android 4.4.2)
+def sdkMin = 19       
 def sdkCompile = 35
 def colorBlack = "#000000"
-def colorPrimary = "#FFFFFF"
+def colorPrimary = "#000000"
 
-// ===== Load Signing Config (only for release) =====
 def keystorePropsFile = rootProject.file("signing.properties")
 def keystoreProps = new Properties()
 if (keystorePropsFile.exists()) {
@@ -21,7 +19,6 @@ if (keystorePropsFile.exists()) {
     println("⚠️ signing.properties not found. Release builds will fail until you add it. Debug builds are fine.")
 }
 
-// ===== Android Configuration =====
 android {
     namespace packageName
     compileSdk = sdkCompile
@@ -48,7 +45,6 @@ android {
 
     buildTypes {
         debug {
-            // Debug build uses default debug key, no signing.properties needed
             applicationIdSuffix ".debug"
             versionNameSuffix "-debug"
         }
@@ -75,7 +71,6 @@ android {
     }
 }
 
-// ===== Update Package Name in Java Files =====
 task updateConfig {
     doLast {
         fileTree(dir: 'src/main/java', include: '**/*.java').each { file ->
@@ -84,7 +79,6 @@ task updateConfig {
     }
 }
 
-// ===== Copy AAB and Mapping =====
 task copyAabToRoot(type: Copy) {
     dependsOn "bundleRelease"
     from("$buildDir/outputs/bundle/release/") { include "*.aab" }
@@ -95,11 +89,9 @@ task copyAabToRoot(type: Copy) {
     }
 }
 
-// ===== Task Dependencies =====
 preBuild.dependsOn updateConfig
 build.finalizedBy copyAabToRoot
 
-// ===== Dependencies =====
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'

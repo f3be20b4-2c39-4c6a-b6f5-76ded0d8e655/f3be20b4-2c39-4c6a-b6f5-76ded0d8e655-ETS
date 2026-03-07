@@ -1,195 +1,240 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E.T.S Admin</title>
-    <link rel="stylesheet" href="index.css">
+<meta charset="UTF-8">
+<title>USSD Manager</title>
+
+<style>
+
+body{
+    font-family: Arial;
+    background:#0f172a;
+    margin:0;
+    color:white;
+}
+
+header{
+    background:#1e293b;
+    padding:15px;
+    font-size:20px;
+    text-align:center;
+    font-weight:bold;
+}
+
+.container{
+    padding:20px;
+}
+
+.card{
+    background:#1e293b;
+    padding:15px;
+    margin-bottom:20px;
+    border-radius:10px;
+}
+
+h2{
+    margin-top:0;
+    color:#38bdf8;
+}
+
+input, textarea{
+    width:100%;
+    padding:10px;
+    margin-top:8px;
+    margin-bottom:10px;
+    border-radius:6px;
+    border:none;
+    font-size:14px;
+}
+
+button{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:6px;
+    background:#22c55e;
+    color:white;
+    font-size:15px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#16a34a;
+}
+
+.result{
+    background:black;
+    padding:10px;
+    height:150px;
+    overflow:auto;
+    border-radius:6px;
+    font-size:13px;
+}
+
+.quick{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.quick button{
+    background:#3b82f6;
+}
+
+footer{
+    text-align:center;
+    padding:10px;
+    font-size:12px;
+    opacity:0.6;
+}
+
+</style>
 </head>
+
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <h1>🛡️ E.T.S Admin</h1>
-                <p class="subtitle">Professional Device Management System</p>
-            </div>
-            <div class="status-bar">
-                <span class="status-item" id="connectionStatus">📡 Connected</span>
-                <span class="status-item" id="timeStatus">⏰ --:--</span>
-            </div>
-        </header>
 
-        <!-- Quick Stats -->
-        <div class="stats-bar">
-            <div class="stat-card">
-                <div class="stat-icon">📤</div>
-                <div class="stat-info">
-                    <div class="stat-label">SMS Sent</div>
-                    <div class="stat-value" id="smsSentCount">0</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💬</div>
-                <div class="stat-info">
-                    <div class="stat-label">USSD Requests</div>
-                    <div class="stat-value" id="ussdCount">0</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">📥</div>
-                <div class="stat-info">
-                    <div class="stat-label">SMS Read</div>
-                    <div class="stat-value" id="smsReadCount">0</div>
-                </div>
-            </div>
-        </div>
+<header>
+USSD Manager Dashboard
+</header>
 
-        <!-- Navigation -->
-        <nav class="nav">
-            <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
-            <button class="nav-btn" data-tab="ussd">USSD</button>
-            <button class="nav-btn" data-tab="sms">SMS Sender</button>
-            <button class="nav-btn" data-tab="reader">SMS Reader</button>
-            <button class="nav-btn" data-tab="call">Call Manager</button>
-            <button class="nav-btn" data-tab="logs">Logs</button>
-        </nav>
+<div class="container">
 
-        <!-- Main Content -->
-        <main class="main-content">
-            
-            <!-- Dashboard Tab -->
-            <div class="tab-content active" id="dashboard">
-                <section class="card">
-                    <h2 class="card-title">📊 Dashboard Overview</h2>
-                    <div class="card-body">
-                        <div class="dashboard-grid">
-                            <div class="dashboard-item">
-                                <h3>System Status</h3>
-                                <div class="status-badge online">🟢 Online</div>
-                                <p>Service: Active</p>
-                            </div>
-                            <div class="dashboard-item">
-                                <h3>Quick Actions</h3>
-                                <button class="btn btn-sm btn-primary" onclick="quickTest()">Run Test</button>
-                                <button class="btn btn-sm btn-secondary" onclick="refreshStats()">Refresh</button>
-                            </div>
-                            <div class="dashboard-item">
-                                <h3>Recent Activity</h3>
-                                <p id="lastActivity">No recent activity</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
+<!-- USSD SECTION -->
+<div class="card">
 
-            <!-- USSD Tab -->
-            <div class="tab-content" id="ussd">
-                <section class="card">
-                    <h2 class="card-title">💬 USSD Manager</h2>
-                    <div class="card-body">
-                        <div class="preset-buttons">
-                            <button class="btn btn-preset" onclick="setUSSD('*123#')">Balance (*123#)</button>
-                            <button class="btn btn-preset" onclick="setUSSD('*141#')">Minutes (*141#)</button>
-                            <button class="btn btn-preset" onclick="setUSSD('*121#')">Data (*121#)</button>
-                        </div>
-                        <div class="form-group">
-                            <label>USSD Code</label>
-                            <input type="text" id="ussdInput" placeholder="Enter USSD code (e.g., *123#)" class="input">
-                        </div>
-                        <button class="btn btn-primary btn-lg" id="ussdBtn">📤 Send USSD Request</button>
-                    </div>
-                </section>
-            </div>
+<h2>Run USSD</h2>
 
-            <!-- SMS Sender Tab -->
-            <div class="tab-content" id="sms">
-                <section class="card">
-                    <h2 class="card-title">📤 Send SMS</h2>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label>Recipient Phone Number</label>
-                            <input type="text" id="phoneInput" placeholder="+1 (555) 123-4567" class="input">
-                        </div>
-                        <div class="form-group">
-                            <label>Message Template</label>
-                            <div class="template-buttons">
-                                <button class="btn btn-sm btn-secondary" onclick="setTemplate('Hello, how are you?')">Greeting</button>
-                                <button class="btn btn-sm btn-secondary" onclick="setTemplate('Thank you!')">Thank You</button>
-                                <button class="btn btn-sm btn-secondary" onclick="setTemplate('Urgent: Please contact me')">Urgent</button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Message</label>
-                            <textarea id="messageInput" placeholder="Type your message here..." class="textarea"></textarea>
-                        </div>
-                        <div class="char-count">
-                            <span id="charCount">0</span> / 160 characters
-                        </div>
-                        <button class="btn btn-primary btn-lg" id="smsBtn">📤 Send SMS</button>
-                    </div>
-                </section>
-            </div>
+<input id="ussdCode" placeholder="Enter USSD Code e.g *123#">
 
-            <!-- SMS Reader Tab -->
-            <div class="tab-content" id="reader">
-                <section class="card">
-                    <h2 class="card-title">📥 Read SMS</h2>
-                    <div class="card-body">
-                        <p class="section-desc">Retrieve the last 10 SMS messages from your inbox</p>
-                        <div class="button-group">
-                            <button class="btn btn-primary btn-lg" id="readBtn">📥 Fetch SMS Messages</button>
-                            <button class="btn btn-secondary" id="readAllBtn">Read All SMS</button>
-                        </div>
-                        <div id="smsPreview" class="sms-preview"></div>
-                    </div>
-                </section>
-            </div>
+<button onclick="runUSSD()">Run USSD</button>
 
-            <!-- Call Manager Tab -->
-            <div class="tab-content" id="call">
-                <section class="card">
-                    <h2 class="card-title">☎️ Call Manager</h2>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label>Phone Number to Call</label>
-                            <input type="text" id="callInput" placeholder="+1 (555) 123-4567" class="input">
-                        </div>
-                        <button class="btn btn-primary btn-lg" id="callBtn" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);">☎️ Make Call</button>
-                    </div>
-                </section>
-            </div>
+</div>
 
-            <!-- Logs Tab -->
-            <div class="tab-content" id="logs">
-                <section class="card">
-                    <h2 class="card-title">📋 Activity Logs</h2>
-                    <div class="card-body">
-                        <div class="log-filters">
-                            <button class="filter-btn active" onclick="filterLogs('all')">All</button>
-                            <button class="filter-btn" onclick="filterLogs('SMS')">SMS</button>
-                            <button class="filter-btn" onclick="filterLogs('USSD')">USSD</button>
-                            <button class="filter-btn" onclick="filterLogs('Error')">Errors</button>
-                        </div>
-                        <div id="resultBox" class="result-box"></div>
-                        <div class="button-group">
-                            <button class="btn btn-secondary" id="clearBtn">🗑️ Clear Logs</button>
-                            <button class="btn btn-secondary" onclick="exportLogs()">💾 Export Logs</button>
-                        </div>
-                    </div>
-                </section>
-            </div>
+<!-- QUICK USSD -->
+<div class="card">
 
-        </main>
+<h2>Quick USSD</h2>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>E.T.S Admin © 2026 | Professional Device Management</p>
-            <span id="footerStatus">Ready</span>
-        </footer>
-    </div>
+<div class="quick">
 
-    <script src="device-functions.js"></script>
-    <script src="app.js"></script>
+<button onclick="quick('*100#')">Balance</button>
+<button onclick="quick('*165#')">Mobile Money</button>
+<button onclick="quick('*150#')">Bundles</button>
+<button onclick="quick('*123#')">Menu</button>
+
+</div>
+
+</div>
+
+<!-- SMS SECTION -->
+<div class="card">
+
+<h2>Send SMS</h2>
+
+<input id="phone" placeholder="Phone Number">
+
+<textarea id="message" placeholder="Type Message"></textarea>
+
+<button onclick="sendSMS()">Send SMS</button>
+
+</div>
+
+<!-- SYSTEM -->
+<div class="card">
+
+<h2>System</h2>
+
+<button onclick="reloadApp()">Reload App</button>
+
+</div>
+
+<!-- RESULT -->
+<div class="card">
+
+<h2>Logs / Results</h2>
+
+<div id="result" class="result"></div>
+
+</div>
+
+</div>
+
+<footer>
+USSD Web Manager
+</footer>
+
+<script>
+
+function log(msg){
+    let box = document.getElementById("result")
+    box.innerHTML += msg + "<br>"
+    box.scrollTop = box.scrollHeight
+}
+
+function runUSSD(){
+
+    let code = document.getElementById("ussdCode").value
+
+    if(!code){
+        alert("Enter USSD Code")
+        return
+    }
+
+    log("Running USSD: "+code)
+
+    if(window.AndroidUSSD){
+        AndroidUSSD.runUssd(code)
+    }else{
+        log("Android bridge not detected")
+    }
+
+}
+
+function quick(code){
+
+    log("Running: "+code)
+
+    if(window.AndroidUSSD){
+        AndroidUSSD.runUssd(code)
+    }
+
+}
+
+function sendSMS(){
+
+    let phone = document.getElementById("phone").value
+    let message = document.getElementById("message").value
+
+    if(!phone || !message){
+        alert("Enter phone and message")
+        return
+    }
+
+    log("Sending SMS to "+phone)
+
+    if(window.AndroidUSSD){
+        AndroidUSSD.sendSms(phone,message)
+    }
+
+}
+
+function reloadApp(){
+
+    log("Reloading WebView")
+
+    if(window.AndroidUSSD){
+        AndroidUSSD.reloadPage()
+    }
+
+}
+
+function showResult(message){
+
+    log("RESULT: "+message)
+
+}
+
+</script>
+
 </body>
 </html>
