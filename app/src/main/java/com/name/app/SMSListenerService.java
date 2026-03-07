@@ -1,4 +1,4 @@
-package com.example.ussdwebview;
+package com.name.app;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -17,7 +17,7 @@ public class SMSListenerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotificationChannel();
-        startForeground(NOTIFICATION_ID, buildNotification());
+        startForeground(NOTIFICATION_ID, buildNotification().build());
         return START_STICKY;
     }
 
@@ -39,7 +39,7 @@ public class SMSListenerService extends Service {
         return new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle("E.T.S App")
                 .setContentText("SMS Listener Active")
-                .setSmallIcon(R.drawable.app_icon)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true);
     }
