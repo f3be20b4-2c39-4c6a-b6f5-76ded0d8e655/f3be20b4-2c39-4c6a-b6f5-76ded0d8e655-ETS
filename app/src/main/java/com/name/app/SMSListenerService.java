@@ -39,7 +39,7 @@ public class SMSListenerService extends Service {
         return new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle("E.T.S App")
                 .setContentText("SMS Listener Active")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(android.R.drawable.app_icon)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true);
     }
