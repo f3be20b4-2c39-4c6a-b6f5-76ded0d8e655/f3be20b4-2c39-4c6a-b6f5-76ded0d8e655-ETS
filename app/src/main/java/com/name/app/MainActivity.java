@@ -1,6 +1,12 @@
 package com.example.ussdwebview;
 
 import android.Manifest;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -20,18 +26,25 @@ import android.webkit.WebViewClient;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
+    private SMSReceiver smsReceiver;
 
     private static final int REQUEST_ALL_PERMISSIONS = 1;
+    private static final String NOTIFICATION_CHANNEL_ID = "ETS_SMS_CHANNEL";
     private String pendingUSSDCode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        createNotificationChannel();
+        registerSMSReceiver();
+        startSMSListenerService();
 
         webView = findViewById(R.id.webview);
 
@@ -62,6 +75,44 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/index.html");
     }
 
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "SMS Notifications",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    private void registerSMSReceiver() {
+        smsReceiver = new SMSReceiver(this);
+        IntentFilter filter = new IntentFilter("android.provider.Telephony.SMS_RECEIVED");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(smsReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(smsReceiver, filter);
+        }
+    }
+
+    private void startSMSListenerService() {
+        Intent serviceIntent = new Intent(this, SMSListenerService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+    }
+
+    public void displaySMSOnWebView(String sender, String message) {
+        String smsData = "SMS from " + sender + ": " + message;
+        sendResultToWeb(smsData);
+    }
+
     private class JSBridge {
 
         @JavascriptInterface
@@ -82,14 +133,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void executeUSSD(String code) {
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            sendResultToWeb("USSD supported on Android 8.0+ only");
-            return;
-        }
-
         if (!hasAllPermissions()) {
             pendingUSSDCode = code;
             requestAllPermissions();
+            return;
+        }
+
+        // USSD only works on Android 8.0+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            sendResultToWeb("USSD not supported on this Android version");
             return;
         }
 
@@ -194,7 +246,8 @@ public class MainActivity extends AppCompatActivity {
                         Manifest.permission.CALL_PHONE,
                         Manifest.permission.READ_PHONE_STATE,
                         Manifest.permission.SEND_SMS,
-                        Manifest.permission.READ_SMS
+                        Manifest.permission.READ_SMS,
+                        Manifest.permission.RECEIVE_SMS
                 },
                 REQUEST_ALL_PERMISSIONS
         );
@@ -244,5 +297,13 @@ public class MainActivity extends AppCompatActivity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (smsReceiver != null) {
+            unregisterReceiver(smsReceiver);
+        }
+        super.onDestroy();
     }
 }
