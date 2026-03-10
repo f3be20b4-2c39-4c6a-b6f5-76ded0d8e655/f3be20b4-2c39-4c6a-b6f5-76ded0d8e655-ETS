@@ -8,8 +8,6 @@ import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.PowerManager;
-import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -18,8 +16,6 @@ import android.webkit.WebViewClient;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.lang.reflect.Method;
-import java.util.Timer;
-import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -29,11 +25,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().addFlags(
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-        );
+        // No FLAG_KEEP_SCREEN_ON; device can sleep normally
 
         setContentView(R.layout.activity_main);
 
@@ -54,16 +46,11 @@ public class MainActivity extends AppCompatActivity {
 
         startService(new Intent(this, ForegroundService.class));
 
-       
         enableHotspotIfOff();
-
-    
-        scheduleTestReboot();
     }
 
     private void enableHotspotIfOff() {
         try {
-
             WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
             Method method = wifiManager.getClass().getDeclaredMethod("isWifiApEnabled");
@@ -72,39 +59,13 @@ public class MainActivity extends AppCompatActivity {
             boolean isHotspotOn = (boolean) method.invoke(wifiManager);
 
             if (!isHotspotOn) {
-
                 Method setMethod = wifiManager.getClass().getMethod(
                         "setWifiApEnabled",
                         android.net.wifi.WifiConfiguration.class,
                         boolean.class
                 );
-
                 setMethod.invoke(wifiManager, null, true);
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void scheduleTestReboot() {
-
-        Timer timer = new Timer();
-
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                rebootDevice();
-            }
-        }, 180000); 
-    }
-
-
-    private void rebootDevice() {
-        try {
-
-            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            pm.reboot(null);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -121,12 +82,9 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onReceive(Context context, Intent intent) {
-
             if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-
                 Intent startIntent = new Intent(context, MainActivity.class);
                 startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
                 context.startActivity(startIntent);
             }
         }
