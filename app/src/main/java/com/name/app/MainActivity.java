@@ -140,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
             Notification notification = new Notification.Builder(this)
                     .setContentTitle("App Running")
                     .setContentText("Foreground service active")
-                    .setSmallIcon(android.R.drawable.app_icon)
+                    .setSmallIcon(android.R.drawable.ic_menu_view)
                     .build();
 
             startForeground(1, notification);
