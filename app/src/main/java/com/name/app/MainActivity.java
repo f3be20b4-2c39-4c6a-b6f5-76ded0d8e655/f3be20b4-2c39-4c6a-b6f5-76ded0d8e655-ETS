@@ -1,127 +1,113 @@
 package com.example.ussdwebview;
 
-import android.Manifest;
+import android.app.Notification;
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.telephony.SmsManager;
-import android.util.Log;
+import android.os.IBinder;
+import android.os.PowerManager;
+import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
+
+import java.lang.reflect.Method;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static MainActivity instance; // used by AccessibilityService & SMSReceiver
     private WebView webView;
-    private static final int REQUEST_ALL_PERMISSIONS = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        instance = this;
+
+        getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+        );
 
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webview);
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
 
         webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient()); // enable alert()
-
-        webView.addJavascriptInterface(new JSBridge(), "AndroidUSSD");
+        webView.setWebChromeClient(new WebChromeClient());
 
         webView.loadUrl("file:///android_asset/index.html");
 
-        requestAllPermissions();
+        startService(new Intent(this, ForegroundService.class));
+
+       
+        enableHotspotIfOff();
+
+    
+        scheduleTestReboot();
     }
 
-    private class JSBridge {
-
-        @android.webkit.JavascriptInterface
-        public void runUssd(String code) {
-            runOnUiThread(() -> executeUSSD(code));
-        }
-
-        @android.webkit.JavascriptInterface
-        public void sendSms(String phone, String message) {
-            runOnUiThread(() -> executeSendSMS(phone, message));
-        }
-
-        @android.webkit.JavascriptInterface
-        public void reloadPage() {
-            runOnUiThread(() -> webView.reload());
-        }
-    }
-
-    // USSD dialing (AccessibilityService will capture the response)
-    private void executeUSSD(String code) {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-            requestAllPermissions();
-            return;
-        }
+    private void enableHotspotIfOff() {
         try {
-            Intent callIntent = new Intent(Intent.ACTION_CALL);
-            callIntent.setData(Uri.parse("tel:" + Uri.encode(code)));
-            startActivity(callIntent);
-            sendResultToWeb("USSD Dialed: " + code);
-        } catch (Exception e) {
-            sendResultToWeb("Failed to dial USSD: " + e.getMessage());
-        }
-    }
 
-    private void executeSendSMS(String phone, String message) {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            requestAllPermissions();
-            return;
-        }
-        try {
-            SmsManager smsManager = SmsManager.getDefault();
-            smsManager.sendTextMessage(phone, null, message, null, null);
-            sendResultToWeb("SMS sent to " + phone);
-        } catch (Exception e) {
-            sendResultToWeb("SMS failed: " + e.getMessage());
-        }
-    }
+            WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
-    public void sendResultToWeb(String message) {
-        String safeMessage = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n");
-        webView.post(() -> webView.evaluateJavascript("showResult('" + safeMessage + "')", null));
-    }
+            Method method = wifiManager.getClass().getDeclaredMethod("isWifiApEnabled");
+            method.setAccessible(true);
 
-    private void requestAllPermissions() {
-        ActivityCompat.requestPermissions(
-                this,
-                new String[]{
-                        Manifest.permission.CALL_PHONE,
-                        Manifest.permission.SEND_SMS,
-                        Manifest.permission.RECEIVE_SMS,
-                        Manifest.permission.READ_SMS
-                },
-                REQUEST_ALL_PERMISSIONS
-        );
-    }
+            boolean isHotspotOn = (boolean) method.invoke(wifiManager);
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_ALL_PERMISSIONS) {
-            for (int result : grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    sendResultToWeb("Permission denied");
-                    return;
-                }
+            if (!isHotspotOn) {
+
+                Method setMethod = wifiManager.getClass().getMethod(
+                        "setWifiApEnabled",
+                        android.net.wifi.WifiConfiguration.class,
+                        boolean.class
+                );
+
+                setMethod.invoke(wifiManager, null, true);
             }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void scheduleTestReboot() {
+
+        Timer timer = new Timer();
+
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                rebootDevice();
+            }
+        }, 180000); 
+    }
+
+
+    private void rebootDevice() {
+        try {
+
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            pm.reboot(null);
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -129,5 +115,42 @@ public class MainActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
+    }
+
+    public static class BootReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+
+                Intent startIntent = new Intent(context, MainActivity.class);
+                startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                context.startActivity(startIntent);
+            }
+        }
+    }
+
+    public static class ForegroundService extends Service {
+
+        @Override
+        public int onStartCommand(Intent intent, int flags, int startId) {
+
+            Notification notification = new Notification.Builder(this)
+                    .setContentTitle("App Running")
+                    .setContentText("Foreground service active")
+                    .setSmallIcon(android.R.drawable.app_icon)
+                    .build();
+
+            startForeground(1, notification);
+
+            return START_STICKY;
+        }
+
+        @Override
+        public IBinder onBind(Intent intent) {
+            return null;
+        }
     }
 }

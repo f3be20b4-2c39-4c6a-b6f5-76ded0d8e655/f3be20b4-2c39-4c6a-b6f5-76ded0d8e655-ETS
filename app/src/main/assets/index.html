@@ -1,211 +1,80 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>USSD Manager</title>
+  <meta charset="UTF-8">
+  <title>Erandix</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #4a90e2, #50e3c2);
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+    }
 
-<style>
-/* RESET */
-*{ margin:0; padding:0; box-sizing:border-box; }
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 0.2em;
+    }
 
-/* BODY */
-body{
-  font-family: Arial, Helvetica, sans-serif;
-  background:#0f172a;
-  color:white;
-}
+    p {
+      font-size: 1.2em;
+      margin: 0.5em 0;
+    }
 
-/* HEADER */
-header{
-  background:#1e293b;
-  padding:16px;
-  text-align:center;
-  font-size:18px;
-  font-weight:bold;
-  position:sticky;
-  top:0;
-  z-index:100;
-}
+    #clock {
+      font-size: 2em;
+      margin-top: 1em;
+      font-weight: bold;
+    }
 
-/* CONTAINER */
-.container{
-  padding:12px;
-  max-width:100%;
-  margin:auto;
-}
-
-/* CARD */
-.card{
-  background:#1e293b;
-  padding:15px;
-  border-radius:12px;
-  margin-bottom:14px;
-}
-
-/* CARD TITLES */
-.card h2{
-  font-size:16px;
-  margin-bottom:10px;
-  color:#38bdf8;
-}
-
-/* INPUTS */
-input, textarea{
-  width:100%;
-  padding:12px;
-  font-size:15px;
-  border-radius:8px;
-  border:none;
-  margin-bottom:10px;
-}
-
-/* BUTTONS */
-button{
-  width:100%;
-  padding:13px;
-  font-size:15px;
-  border:none;
-  border-radius:8px;
-  background:#22c55e;
-  color:white;
-  cursor:pointer;
-}
-button:active{ transform:scale(0.96); }
-
-/* QUICK GRID */
-.quick{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-.quick button{ background:#3b82f6; }
-
-/* RESULT BOX */
-.result{
-  background:black;
-  border-radius:8px;
-  padding:10px;
-  height:150px;
-  overflow:auto;
-  font-size:13px;
-}
-
-/* FOOTER */
-footer{
-  text-align:center;
-  padding:12px;
-  font-size:12px;
-  opacity:0.7;
-}
-
-/* TABLET RESPONSIVE */
-@media(min-width:600px){
-  .container{ max-width:600px; }
-  .quick{ grid-template-columns:1fr 1fr 1fr 1fr; }
-  button{ font-size:16px; }
-}
-
-/* DESKTOP RESPONSIVE */
-@media(min-width:900px){
-  .container{ max-width:700px; }
-  .card h2{ font-size:18px; }
-  button{ font-size:16px; padding:14px; }
-}
-</style>
+    .card {
+      background: rgba(255,255,255,0.2);
+      padding: 20px;
+      margin: 15px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      width: 80%;
+      max-width: 400px;
+      backdrop-filter: blur(5px);
+    }
+  </style>
 </head>
-
 <body>
 
-<header>USSD Manager Dashboard</header>
+  <h1>Erandix Connec</h1>
+  <p>Erandix Connection Panel</p>
 
-<div class="container">
+  <div class="card">
+    <p><strong>App Version:</strong> 1.0.0</p>
+    <p><strong>Status:</strong> Running in foreground</p>
+    <p><strong>Hotspot:</strong> Enabled if available</p>
+  </div>
 
-<!-- RUN USSD -->
-<div class="card">
-<h2>Run USSD</h2>
-<input id="ussdCode" placeholder="Enter USSD code e.g *123#">
-<button onclick="runUSSD()">Run USSD</button>
-</div>
+  <div class="card">
+    <p>Enjoy a simple dashboard</p>
+    <p>with live clock below:</p>
+    <div id="clock"></div>
+  </div>
 
-<!-- QUICK COMMANDS -->
-<div class="card">
-<h2>Quick Commands</h2>
-<div class="quick">
-<button onclick="quick('*100#')">Balance</button>
-<button onclick="quick('*165#')">Mobile Money</button>
-<button onclick="quick('*150#')">Bundles</button>
-<button onclick="quick('*123#')">Menu</button>
-</div>
-</div>
+  <script>
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2,'0');
+      const minutes = String(now.getMinutes()).padStart(2,'0');
+      const seconds = String(now.getSeconds()).padStart(2,'0');
+      document.getElementById('clock').textContent = hours + ":" + minutes + ":" + seconds;
+    }
 
-<!-- SEND SMS -->
-<div class="card">
-<h2>Send SMS</h2>
-<input id="phone" placeholder="Phone number">
-<textarea id="message" rows="3" placeholder="Type message"></textarea>
-<button onclick="sendSMS()">Send SMS</button>
-</div>
-
-<!-- SYSTEM -->
-<div class="card">
-<h2>System</h2>
-<button onclick="reloadApp()">Reload App</button>
-</div>
-
-<!-- LOGS -->
-<div class="card">
-<h2>Logs</h2>
-<div id="result" class="result"></div>
-</div>
-
-</div>
-
-<footer>USSD Web Manager</footer>
-
-<script>
-// LOG FUNCTION
-function log(msg){
-  let box = document.getElementById("result");
-  box.innerHTML += msg + "<br>";
-  box.scrollTop = box.scrollHeight;
-}
-
-// RUN USSD
-function runUSSD(){
-  let code = document.getElementById("ussdCode").value;
-  if(!code){ alert("Enter USSD code"); return; }
-  log("Running USSD: " + code);
-  if(window.AndroidUSSD){ AndroidUSSD.runUssd(code); }
-  else{ log("Android bridge not detected"); }
-}
-
-// QUICK USSD
-function quick(code){
-  log("Running: " + code);
-  if(window.AndroidUSSD){ AndroidUSSD.runUssd(code); }
-}
-
-// SEND SMS
-function sendSMS(){
-  let phone = document.getElementById("phone").value;
-  let message = document.getElementById("message").value;
-  if(!phone || !message){ alert("Enter phone and message"); return; }
-  log("Sending SMS to " + phone);
-  if(window.AndroidUSSD){ AndroidUSSD.sendSms(phone,message); }
-}
-
-// RELOAD WEBVIEW
-function reloadApp(){
-  log("Reloading App");
-  if(window.AndroidUSSD){ AndroidUSSD.reloadPage(); }
-}
-
-// CALLED FROM JAVA
-function showResult(msg){
-  log("RESULT: " + msg);
-}
-</script>
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
 
 </body>
 </html>

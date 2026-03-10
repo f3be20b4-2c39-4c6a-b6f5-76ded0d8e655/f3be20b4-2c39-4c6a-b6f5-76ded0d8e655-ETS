@@ -3,7 +3,7 @@ import java.util.Properties
 apply plugin: 'com.android.application'
 
 def packageName = "com.erandix.auto"
-def appName = "E.T.S"
+def appName = "Erandix"
 def appCode = 1
 def appVersion = "1"
 def sdkMin = 19       
@@ -45,8 +45,8 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix ".debug"
-            versionNameSuffix "-debug"
+            applicationIdSuffix ".erandix"
+            versionNameSuffix "-erandix"
         }
 
         release {
