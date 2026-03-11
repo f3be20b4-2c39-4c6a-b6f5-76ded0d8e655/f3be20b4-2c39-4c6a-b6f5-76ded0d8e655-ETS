@@ -48,31 +48,36 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
-    private static final int REQUEST_CALL_PERMISSION = 1;
+    private static final int REQUEST_CALL_PERMISSION = 100;
+    private static final int REQUEST_SMS_PERMISSION = 101;
     private String pendingUSSDCode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Ensure layout exists
         setContentView(R.layout.activity_main);
 
-        // Start foreground service correctly
-        startForegroundServiceHelper();
-
-        // Setup WebView
+        // Initialize WebView safely
         webView = findViewById(R.id.webview);
-        setupWebView();
-        webView.loadUrl("file:///android_asset/index.html");
+        if (webView != null) setupWebView();
+        else Log.e("MainActivity", "WebView not found in layout!");
 
-        // Check and connect to Wi-Fi
+        // Start foreground service (safe)
+        startForegroundServiceSafely();
+
+        // Connect to Wi-Fi
         checkAndConnectWifi();
 
-        // Load SMS inbox and register live receiver
+        // Request SMS permission and load inbox
         requestSmsPermissionAndLoadInbox();
+
+        // Load local HTML safely
+        if (webView != null) webView.loadUrl("file:///android_asset/index.html");
     }
 
-    // -------------------- Foreground Service Starter --------------------
-    private void startForegroundServiceHelper() {
+    private void startForegroundServiceSafely() {
         Intent serviceIntent = new Intent(this, USSDForegroundService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
@@ -81,7 +86,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // -------------------- WebView & JS Bridge --------------------
     private void setupWebView() {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -135,114 +139,65 @@ public class MainActivity extends AppCompatActivity {
         finish();
     }
 
-    // -------------------- SYSTEM UI --------------------
     private void changeSystemBarsColor(String colorString) {
         try {
             int color = Color.parseColor(colorString);
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 window.setStatusBarColor(color);
                 window.setNavigationBarColor(color);
             }
-
+            // handle light/dark system bars
             boolean isLightColor = isColorLight(color);
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (window.getInsetsController() != null) {
-                    if (isLightColor) {
-                        window.getInsetsController().setSystemBarsAppearance(
-                                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                                        | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
-                                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                                        | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-                        );
-                    } else {
-                        window.getInsetsController().setSystemBarsAppearance(
-                                0,
-                                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                                        | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-                        );
-                    }
-                }
-            } else {
-                View decorView = window.getDecorView();
-                int flags = decorView.getSystemUiVisibility();
-
-                if (isLightColor) {
-                    flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-                    }
-                } else {
-                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-                    }
-                }
-
-                decorView.setSystemUiVisibility(flags);
-            }
-
+            View decorView = window.getDecorView();
+            int flags = decorView.getSystemUiVisibility();
+            if (isLightColor) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            else flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            decorView.setSystemUiVisibility(flags);
         } catch (Exception e) {
             Log.e("SYSTEM_BAR", "Invalid color: " + colorString);
         }
     }
 
     private boolean isColorLight(int color) {
-        double darkness = 1 - (0.299 * Color.red(color)
-                + 0.587 * Color.green(color)
-                + 0.114 * Color.blue(color)) / 255;
+        double darkness = 1 - (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255;
         return darkness < 0.5;
     }
 
-    // -------------------- USSD --------------------
+    // ---------------- USSD ----------------
     private void executeUSSD(String code, int simSlot) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             sendResultToWeb("USSD supported on Android 8.0+ only");
             return;
         }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
-                != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
 
             pendingUSSDCode = code + "|" + simSlot;
-
-            ActivityCompat.requestPermissions(
-                    this,
+            ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.CALL_PHONE, Manifest.permission.READ_PHONE_STATE},
-                    REQUEST_CALL_PERMISSION
-            );
+                    REQUEST_CALL_PERMISSION);
             return;
         }
 
         try {
-            SubscriptionManager subscriptionManager = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
-
-            if (subscriptionManager == null) {
-                sendResultToWeb("Subscription service unavailable");
-                return;
-            }
-
-            List<SubscriptionInfo> subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
-            if (subscriptionInfoList == null || subscriptionInfoList.size() <= simSlot) {
+            SubscriptionManager sm = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+            List<SubscriptionInfo> list = sm.getActiveSubscriptionInfoList();
+            if (list == null || list.size() <= simSlot) {
                 sendResultToWeb("Selected SIM not available");
                 return;
             }
 
-            int subscriptionId = subscriptionInfoList.get(simSlot).getSubscriptionId();
-            TelephonyManager telephonyManager = ((TelephonyManager) getSystemService(TELEPHONY_SERVICE))
-                    .createForSubscriptionId(subscriptionId);
+            int subscriptionId = list.get(simSlot).getSubscriptionId();
+            TelephonyManager tm = ((TelephonyManager) getSystemService(TELEPHONY_SERVICE)).createForSubscriptionId(subscriptionId);
 
-            telephonyManager.sendUssdRequest(code, new TelephonyManager.UssdResponseCallback() {
+            tm.sendUssdRequest(code, new TelephonyManager.UssdResponseCallback() {
                 @Override
                 public void onReceiveUssdResponse(TelephonyManager telephonyManager, String request, CharSequence response) {
                     sendResultToWeb(response.toString());
                 }
-
                 @Override
                 public void onReceiveUssdResponseFailed(TelephonyManager telephonyManager, String request, int failureCode) {
                     sendResultToWeb("USSD failed: " + failureCode);
@@ -254,49 +209,38 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // -------------------- SMS Send --------------------
+    // ---------------- SMS ----------------
     private void executeSMS(String phoneNumber, String message, int simSlot) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
-                != PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
 
-            ActivityCompat.requestPermissions(
-                    this,
+            ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE},
-                    REQUEST_CALL_PERMISSION
-            );
+                    REQUEST_SMS_PERMISSION);
             return;
         }
 
         try {
-            SubscriptionManager subscriptionManager = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
-            if (subscriptionManager == null) {
-                sendResultToWeb("Subscription service unavailable");
-                return;
-            }
-
-            List<SubscriptionInfo> subscriptionInfoList = subscriptionManager.getActiveSubscriptionInfoList();
-            if (subscriptionInfoList == null || subscriptionInfoList.size() <= simSlot) {
+            SubscriptionManager sm = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+            List<SubscriptionInfo> list = sm.getActiveSubscriptionInfoList();
+            if (list == null || list.size() <= simSlot) {
                 sendResultToWeb("Selected SIM not available");
                 return;
             }
 
-            int subscriptionId = subscriptionInfoList.get(simSlot).getSubscriptionId();
+            int subscriptionId = list.get(simSlot).getSubscriptionId();
             android.telephony.SmsManager smsManager = android.telephony.SmsManager.getSmsManagerForSubscriptionId(subscriptionId);
-
             smsManager.sendTextMessage(phoneNumber, null, message, null, null);
             sendResultToWeb("SMS sent to " + phoneNumber + " using SIM " + simSlot);
-
         } catch (Exception e) {
             sendResultToWeb("SMS failed: " + e.getMessage());
         }
     }
 
-    // -------------------- SMS Read & Live --------------------
+    // ---------------- SMS Read ----------------
     private void requestSmsPermissionAndLoadInbox() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_SMS}, 1234);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_SMS}, REQUEST_SMS_PERMISSION);
         } else {
             loadSmsInbox();
             registerSmsReceiver();
@@ -308,18 +252,16 @@ public class MainActivity extends AppCompatActivity {
             Cursor cursor = getContentResolver().query(
                     Telephony.Sms.Inbox.CONTENT_URI,
                     new String[]{Telephony.Sms.Inbox._ID, Telephony.Sms.Inbox.ADDRESS, Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.DATE},
-                    null, null,
-                    Telephony.Sms.Inbox.DEFAULT_SORT_ORDER
+                    null, null, Telephony.Sms.Inbox.DEFAULT_SORT_ORDER
             );
 
             if (cursor != null) {
                 while (cursor.moveToNext()) {
                     String id = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.Inbox._ID));
-                    String address = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.Inbox.ADDRESS));
+                    String number = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.Inbox.ADDRESS));
                     String body = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.Inbox.BODY));
                     long date = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.Inbox.DATE));
-
-                    sendSmsToWeb(id, address, body, date);
+                    sendSmsToWeb(id, number, body, date);
                 }
                 cursor.close();
             }
@@ -329,20 +271,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void registerSmsReceiver() {
-        IntentFilter filter = new IntentFilter("android.provider.Telephony.SMS_RECEIVED");
+        IntentFilter filter = new IntentFilter(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
         registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if (intent.getAction() != null && intent.getAction().equals("android.provider.Telephony.SMS_RECEIVED")) {
+                if (Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction())) {
                     Object[] pdus = (Object[]) intent.getExtras().get("pdus");
                     if (pdus != null) {
                         for (Object pdu : pdus) {
                             SmsMessage sms = SmsMessage.createFromPdu((byte[]) pdu, intent.getExtras().getString("format"));
-                            String address = sms.getOriginatingAddress();
-                            String body = sms.getMessageBody();
-                            long date = sms.getTimestampMillis();
-                            String id = String.valueOf(System.currentTimeMillis());
-                            sendSmsToWeb(id, address, body, date);
+                            sendSmsToWeb(String.valueOf(System.currentTimeMillis()), sms.getOriginatingAddress(), sms.getMessageBody(), sms.getTimestampMillis());
                         }
                     }
                 }
@@ -351,14 +289,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendSmsToWeb(String id, String number, String message, long date) {
+        if (webView == null) return;
         String safeMessage = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n");
         String safeNumber = number.replace("\\", "\\\\").replace("'", "\\'");
         String js = "addSmsToIndexedDB('" + id + "','" + safeNumber + "','" + safeMessage + "'," + date + ")";
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
-    // -------------------- Utility --------------------
     private void sendResultToWeb(String message) {
+        if (webView == null) return;
         String safeMessage = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n");
         webView.post(() -> webView.evaluateJavascript("showResult('" + safeMessage + "')", null));
     }
@@ -368,47 +307,34 @@ public class MainActivity extends AppCompatActivity {
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == 1234 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == REQUEST_SMS_PERMISSION && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             loadSmsInbox();
             registerSmsReceiver();
         }
 
         if (requestCode == REQUEST_CALL_PERMISSION && grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            if (pendingUSSDCode != null) {
-                String[] parts = pendingUSSDCode.split("\\|");
-                executeUSSD(parts[0], Integer.parseInt(parts[1]));
-                pendingUSSDCode = null;
-            }
-        } else {
-            sendResultToWeb("Permission denied");
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED && pendingUSSDCode != null) {
+            String[] parts = pendingUSSDCode.split("\\|");
+            executeUSSD(parts[0], Integer.parseInt(parts[1]));
+            pendingUSSDCode = null;
         }
     }
 
     @Override
     public void onBackPressed() {
-        if (webView.canGoBack()) webView.goBack();
+        if (webView != null && webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
     }
 
-    // -------------------- FOREGROUND SERVICE --------------------
+    // ---------------- Foreground Service ----------------
     public static class USSDForegroundService extends Service {
         private static final String CHANNEL_ID = "USSDForegroundService";
 
         @Override
         public void onCreate() {
             super.onCreate();
-
-            // Create notification channel
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                NotificationChannel channel = new NotificationChannel(
-                        CHANNEL_ID,
-                        "USSD Foreground Service",
-                        NotificationManager.IMPORTANCE_LOW
-                );
-                NotificationManager manager = getSystemService(NotificationManager.class);
-                if (manager != null) manager.createNotificationChannel(channel);
-            }
+            createNotificationChannel();
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("USSD App Running")
@@ -417,13 +343,14 @@ public class MainActivity extends AppCompatActivity {
                     .setOngoing(true);
 
             startForeground(1, builder.build());
+        }
 
-            // Launch MainActivity safely
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                Intent activityIntent = new Intent(this, MainActivity.class);
-                activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(activityIntent);
-            }, 2000); // delay to ensure boot completed
+        private void createNotificationChannel() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "USSD Foreground Service", NotificationManager.IMPORTANCE_LOW);
+                NotificationManager manager = getSystemService(NotificationManager.class);
+                if (manager != null) manager.createNotificationChannel(channel);
+            }
         }
 
         @Nullable
@@ -431,23 +358,20 @@ public class MainActivity extends AppCompatActivity {
         public IBinder onBind(Intent intent) { return null; }
     }
 
-    // -------------------- BOOT RECEIVER --------------------
+    // ---------------- Boot Receiver ----------------
     public static class BootReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
                 Intent serviceIntent = new Intent(context, USSDForegroundService.class);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                     context.startForegroundService(serviceIntent);
-                } else {
-                    context.startService(serviceIntent);
-                }
-                Log.d("BOOT", "BootReceiver triggered, foreground service started");
+                else context.startService(serviceIntent);
             }
         }
     }
 
-    // -------------------- Wi-Fi Auto Connect --------------------
+    // ---------------- Wi-Fi Auto Connect ----------------
     private void checkAndConnectWifi() {
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if (wifiManager == null) return;
@@ -473,15 +397,16 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onAvailable(Network network) {
                     super.onAvailable(network);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) connectivityManager.bindProcessToNetwork(network);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                        connectivityManager.bindProcessToNetwork(network);
                     else ConnectivityManager.setProcessDefaultNetwork(network);
-                    Log.d("WiFi", "Connected to Erandix");
+                    Log.d("WiFi", "Connected to " + ssid);
                 }
 
                 @Override
                 public void onUnavailable() {
                     super.onUnavailable();
-                    Log.d("WiFi", "Failed to connect to Erandix");
+                    Log.d("WiFi", "Failed to connect to " + ssid);
                 }
             });
 
@@ -489,7 +414,6 @@ public class MainActivity extends AppCompatActivity {
             WifiConfiguration conf = new WifiConfiguration();
             conf.SSID = "\"" + ssid + "\"";
             conf.preSharedKey = "\"" + password + "\"";
-
             int netId = wifiManager.addNetwork(conf);
             wifiManager.disconnect();
             wifiManager.enableNetwork(netId, true);
