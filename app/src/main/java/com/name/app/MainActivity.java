@@ -56,8 +56,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Start foreground service to keep app alive
-        startForegroundService();
+        // Start foreground service correctly
+        startForegroundServiceHelper();
 
         // Setup WebView
         webView = findViewById(R.id.webview);
@@ -69,6 +69,16 @@ public class MainActivity extends AppCompatActivity {
 
         // Load SMS inbox and register live receiver
         requestSmsPermissionAndLoadInbox();
+    }
+
+    // -------------------- Foreground Service Starter --------------------
+    private void startForegroundServiceHelper() {
+        Intent serviceIntent = new Intent(this, USSDForegroundService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
     }
 
     // -------------------- WebView & JS Bridge --------------------
@@ -125,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
         finish();
     }
 
+    // -------------------- SYSTEM UI --------------------
     private void changeSystemBarsColor(String colorString) {
         try {
             int color = Color.parseColor(colorString);
