@@ -6,7 +6,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -43,7 +45,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
         super.onCreate(savedInstanceState);
 
         webView = new WebView(this);
@@ -53,81 +54,66 @@ public class MainActivity extends AppCompatActivity {
 
         webView.loadUrl("file:///android_asset/index.html");
 
+        // Register SMS receiver
         registerReceiver(smsReceiver,
                 new IntentFilter("android.provider.Telephony.SMS_RECEIVED"));
+
+        // Load all SMS after WebView is ready
+        new Handler().postDelayed(() -> loadAllSMS(), 2000);
     }
 
     private void setupWebView() {
-
         WebSettings settings = webView.getSettings();
-
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
 
         webView.setWebViewClient(new WebViewClient());
-
         webView.addJavascriptInterface(new JSBridge(), "AndroidBridge");
     }
 
     class JSBridge {
-
         @JavascriptInterface
         public void runUssd(String code, int simSlot) {
-
             runOnUiThread(() -> executeUSSD(code, simSlot));
         }
 
         @JavascriptInterface
         public void sendSMS(String number, String message, int simSlot) {
-
-            runOnUiThread(() -> sendSMS(number, message, simSlot));
+            runOnUiThread(() -> sendSMSInternal(number, message, simSlot));
         }
 
         @JavascriptInterface
         public void setSystemColor(String color) {
-
             runOnUiThread(() -> changeSystemColor(color));
         }
     }
 
     private void changeSystemColor(String colorString) {
-
         try {
-
             int color = Color.parseColor(colorString);
-
             Window window = getWindow();
-
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-
                 window.setStatusBarColor(color);
                 window.setNavigationBarColor(color);
             }
-
         } catch (Exception e) {
-
             Log.e("COLOR","Invalid color");
         }
     }
 
     private void executeUSSD(String code, int simSlot) {
-
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-
             sendResult("USSD requires Android 8+");
             return;
         }
 
         if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CALL_PHONE)
-                != PackageManager.PERMISSION_GRANTED ||
+                Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this,
-                        Manifest.permission.READ_PHONE_STATE)
-                        != PackageManager.PERMISSION_GRANTED) {
+                        Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
 
             pendingUSSD = code + "|" + simSlot;
 
@@ -138,20 +124,20 @@ public class MainActivity extends AppCompatActivity {
                             Manifest.permission.READ_PHONE_STATE
                     },
                     REQUEST_USSD_PERMISSION);
-
             return;
         }
 
         try {
-
             SubscriptionManager subscriptionManager =
-                    (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+                    (SubscriptionManager)getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
 
-            List<SubscriptionInfo> list =
-                    subscriptionManager.getActiveSubscriptionInfoList();
+            if(subscriptionManager == null){
+                sendResult("No subscription manager");
+                return;
+            }
 
-            if (list == null || list.size() <= simSlot) {
-
+            List<SubscriptionInfo> list = subscriptionManager.getActiveSubscriptionInfoList();
+            if(list == null || list.size() == 0 || simSlot >= list.size()){
                 sendResult("SIM not available");
                 return;
             }
@@ -159,19 +145,17 @@ public class MainActivity extends AppCompatActivity {
             int subId = list.get(simSlot).getSubscriptionId();
 
             TelephonyManager telephonyManager =
-                    ((TelephonyManager) getSystemService(TELEPHONY_SERVICE))
+                    ((TelephonyManager)getSystemService(TELEPHONY_SERVICE))
                             .createForSubscriptionId(subId);
 
             telephonyManager.sendUssdRequest(
                     code,
                     new TelephonyManager.UssdResponseCallback() {
-
                         @Override
                         public void onReceiveUssdResponse(
                                 TelephonyManager telephonyManager,
                                 String request,
                                 CharSequence response) {
-
                             sendResult(response.toString());
                         }
 
@@ -180,183 +164,176 @@ public class MainActivity extends AppCompatActivity {
                                 TelephonyManager telephonyManager,
                                 String request,
                                 int failureCode) {
-
-                            sendResult("USSD failed: "+failureCode);
+                            sendResult("USSD failed: " + failureCode);
                         }
-
                     },
                     new Handler(Looper.getMainLooper())
             );
 
-        } catch (Exception e) {
-
+        } catch (Exception e){
             sendResult("USSD error: "+e.getMessage());
         }
     }
 
-    private void sendSMS(String number,String message,int simSlot) {
-
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.SEND_SMS)
+    private void sendSMSInternal(String number,String message,int simSlot){
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
                 != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this,
-                        Manifest.permission.READ_PHONE_STATE)
-                        != PackageManager.PERMISSION_GRANTED) {
+                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
+                        != PackageManager.PERMISSION_GRANTED){
 
-            pendingSMS = number+"|"+message+"|"+simSlot;
-
+            pendingSMS = number + "|" + message + "|" + simSlot;
             ActivityCompat.requestPermissions(
                     this,
-                    new String[]{
-                            Manifest.permission.SEND_SMS,
-                            Manifest.permission.READ_PHONE_STATE
-                    },
-                    REQUEST_SMS_PERMISSION);
-
+                    new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE},
+                    REQUEST_SMS_PERMISSION
+            );
             return;
         }
 
-        try {
-
+        try{
             SubscriptionManager subscriptionManager =
-                    (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+                    (SubscriptionManager)getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
 
-            List<SubscriptionInfo> list =
-                    subscriptionManager.getActiveSubscriptionInfoList();
+            if(subscriptionManager == null){
+                sendResult("No subscription manager");
+                return;
+            }
 
-            if (list == null || list.size() <= simSlot) {
-
+            List<SubscriptionInfo> list = subscriptionManager.getActiveSubscriptionInfoList();
+            if(list == null || list.size() == 0 || simSlot >= list.size()){
                 sendResult("SIM not available");
                 return;
             }
 
             int subId = list.get(simSlot).getSubscriptionId();
 
-            SmsManager smsManager =
-                    SmsManager.getSmsManagerForSubscriptionId(subId);
+            SmsManager smsManager;
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1){
+                smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
+            } else {
+                smsManager = SmsManager.getDefault();
+            }
 
-            smsManager.sendTextMessage(
-                    number,
-                    null,
-                    message,
-                    null,
-                    null
-            );
+            smsManager.sendTextMessage(number,null,message,null,null);
+            sendResult("SMS sent successfully");
 
-            sendResult("SMS sent");
-
-        } catch (Exception e) {
-
+        } catch(Exception e){
             sendResult("SMS error: "+e.getMessage());
         }
     }
 
-    private void sendResult(String message) {
-
-        String safe = message
-                .replace("\\","\\\\")
+    private void sendResult(String message){
+        String safe = message.replace("\\","\\\\")
                 .replace("'","\\'")
                 .replace("\n","\\n");
-
         webView.post(() ->
-                webView.evaluateJavascript(
-                        "showResult('"+safe+"')",
-                        null));
+                webView.evaluateJavascript("showResult('"+safe+"')",null)
+        );
     }
 
-    private void sendIncomingSMS(String number,String message){
-
-        String safeNumber = number.replace("'","\\'");
-        String safeMessage = message
-                .replace("\\","\\\\")
-                .replace("'","\\'")
-                .replace("\n","\\n");
-
-        webView.post(() ->
-                webView.evaluateJavascript(
-                        "onSMSReceived('"+safeNumber+"','"+safeMessage+"')",
-                        null));
-    }
+    // ---------------- SMS Handling ----------------
 
     private BroadcastReceiver smsReceiver = new BroadcastReceiver() {
-
         @Override
         public void onReceive(Context context, Intent intent) {
-
             Bundle bundle = intent.getExtras();
-
-            if(bundle==null) return;
-
+            if(bundle == null) return;
             Object[] pdus = (Object[]) bundle.get("pdus");
+            if(pdus == null) return;
 
-            if(pdus==null) return;
-
-            for(Object pdu:pdus){
-
+            for(Object pdu: pdus){
                 SmsMessage sms;
-
-                if(Build.VERSION.SDK_INT>=23){
-
+                if(Build.VERSION.SDK_INT >= 23){
                     String format = bundle.getString("format");
-
                     sms = SmsMessage.createFromPdu((byte[])pdu,format);
-
-                }else{
-
+                } else {
                     sms = SmsMessage.createFromPdu((byte[])pdu);
                 }
-
-                String number = sms.getOriginatingAddress();
-                String message = sms.getMessageBody();
-
-                sendIncomingSMS(number,message);
+                sendIncomingSMS(sms.getOriginatingAddress(), sms.getMessageBody());
             }
         }
     };
 
+    private void sendIncomingSMS(String number,String message){
+        String safeNumber = number.replace("'","\\'");
+        String safeMessage = message.replace("\\","\\\\")
+                .replace("'","\\'")
+                .replace("\n","\\n");
+        webView.post(() ->
+                webView.evaluateJavascript(
+                        "onSMSReceived('"+safeNumber+"','"+safeMessage+"')", null));
+    }
+
+    private void loadAllSMS(){
+        // Read inbox
+        try{
+            Cursor cursor = getContentResolver().query(
+                    Uri.parse("content://sms/inbox"),
+                    null,null,null,"date DESC"
+            );
+            if(cursor != null){
+                int bodyIndex = cursor.getColumnIndex("body");
+                int numberIndex = cursor.getColumnIndex("address");
+                while(cursor.moveToNext()){
+                    String number = cursor.getString(numberIndex);
+                    String message = cursor.getString(bodyIndex);
+                    sendIncomingSMS(number,message);
+                }
+                cursor.close();
+            }
+        } catch(Exception e){
+            sendResult("Load inbox error: "+e.getMessage());
+        }
+
+        // Read sent
+        try{
+            Cursor cursor = getContentResolver().query(
+                    Uri.parse("content://sms/sent"),
+                    null,null,null,"date DESC"
+            );
+            if(cursor != null){
+                int bodyIndex = cursor.getColumnIndex("body");
+                int numberIndex = cursor.getColumnIndex("address");
+                while(cursor.moveToNext()){
+                    String number = cursor.getString(numberIndex);
+                    String message = cursor.getString(bodyIndex);
+                    sendIncomingSMS(number,message);
+                }
+                cursor.close();
+            }
+        } catch(Exception e){
+            sendResult("Load sent error: "+e.getMessage());
+        }
+    }
+
     @Override
-    protected void onDestroy() {
-
+    protected void onDestroy(){
         super.onDestroy();
-
         unregisterReceiver(smsReceiver);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-
+                                           @NonNull int[] grantResults){
         super.onRequestPermissionsResult(requestCode,permissions,grantResults);
 
-        if(requestCode==REQUEST_USSD_PERMISSION){
-
-            if(grantResults.length>0 &&
-                    grantResults[0]==PackageManager.PERMISSION_GRANTED){
-
-                if(pendingUSSD!=null){
-
-                    String[] p=pendingUSSD.split("\\|");
-
-                    executeUSSD(p[0],Integer.parseInt(p[1]));
-
-                    pendingUSSD=null;
+        if(requestCode == REQUEST_USSD_PERMISSION){
+            if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                if(pendingUSSD != null){
+                    String[] p = pendingUSSD.split("\\|");
+                    executeUSSD(p[0], Integer.parseInt(p[1]));
+                    pendingUSSD = null;
                 }
             }
         }
 
-        if(requestCode==REQUEST_SMS_PERMISSION){
-
-            if(grantResults.length>0 &&
-                    grantResults[0]==PackageManager.PERMISSION_GRANTED){
-
-                if(pendingSMS!=null){
-
-                    String[] p=pendingSMS.split("\\|");
-
-                    sendSMS(p[0],p[1],Integer.parseInt(p[2]));
-
-                    pendingSMS=null;
+        if(requestCode == REQUEST_SMS_PERMISSION){
+            if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                if(pendingSMS != null){
+                    String[] p = pendingSMS.split("\\|");
+                    sendSMSInternal(p[0],p[1],Integer.parseInt(p[2]));
+                    pendingSMS = null;
                 }
             }
         }
