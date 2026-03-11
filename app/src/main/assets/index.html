@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SMS & USSD Control Panel</title>
+<title>SMS & USSD Dashboard</title>
 
 <style>
 body{
@@ -13,7 +13,7 @@ body{
     padding:20px;
 }
 .container{
-    max-width:500px;
+    max-width:600px;
     margin:auto;
 }
 h2{text-align:center;margin-bottom:20px;}
@@ -57,16 +57,18 @@ button:hover{background:#0ea5e9;}
     border-bottom:1px solid #334155;
     padding:6px 0;
 }
-.number{color:#38bdf8;font-weight:bold;}
+.inbox{color:#38bdf8;}       /* Blue for inbox */
+.sent{color:#4ade80;}        /* Green for sent */
+.incoming{color:#facc15;}    /* Yellow for new SMS */
+.number{font-weight:bold;}
 </style>
-
 </head>
+
 <body>
-
 <div class="container">
+<h2>Android SMS & USSD Dashboard</h2>
 
-<h2>Android SMS & USSD Panel</h2>
-
+<!-- USSD Panel -->
 <div class="card">
 <h3>Run USSD</h3>
 <input id="ussdCode" placeholder="Enter USSD code e.g *100#">
@@ -77,6 +79,7 @@ button:hover{background:#0ea5e9;}
 <button onclick="runUSSD()">Run USSD</button>
 </div>
 
+<!-- Send SMS Panel -->
 <div class="card">
 <h3>Send SMS</h3>
 <input id="smsNumber" placeholder="Phone number">
@@ -88,13 +91,15 @@ button:hover{background:#0ea5e9;}
 <button onclick="sendSMS()">Send SMS</button>
 </div>
 
+<!-- USSD Result Log -->
 <div class="card">
 <h3>USSD Result</h3>
 <div id="ussdResult" class="log"></div>
 </div>
 
+<!-- SMS Logs -->
 <div class="card">
-<h3>Messages (Inbox + Sent + Incoming)</h3>
+<h3>Messages</h3>
 <div id="smsList" class="log"></div>
 </div>
 
@@ -118,16 +123,25 @@ function sendSMS(){
     else{ showResult("Android bridge not available"); }
 }
 
+// USSD result log
 function showResult(msg){
     let box=document.getElementById("ussdResult");
     box.innerHTML+="<div>"+msg+"</div>";
     box.scrollTop=box.scrollHeight;
 }
 
-function onSMSReceived(number,message){
+// SMS logs
+function onSMSReceived(number,message,type){
+    // type = inbox, sent, incoming
     let box=document.getElementById("smsList");
-    box.innerHTML+="<div class='sms'><span class='number'>"+number+"</span><br>"+message+"</div>";
+    let className = type==='sent'?'sent': type==='inbox'?'inbox':'incoming';
+    box.innerHTML+="<div class='sms "+className+"'><span class='number'>"+number+"</span><br>"+message+"</div>";
     box.scrollTop=box.scrollHeight;
+}
+
+// Helper to display messages from Java with type
+function displaySMS(number,message,type){
+    onSMSReceived(number,message,type);
 }
 </script>
 

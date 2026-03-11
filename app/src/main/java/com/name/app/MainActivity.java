@@ -39,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_USSD_PERMISSION = 1;
     private static final int REQUEST_SMS_PERMISSION = 2;
+    private static final int REQUEST_READ_SMS = 100;
 
     private String pendingUSSD;
     private String pendingSMS;
@@ -55,11 +56,10 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/index.html");
 
         // Register SMS receiver
-        registerReceiver(smsReceiver,
-                new IntentFilter("android.provider.Telephony.SMS_RECEIVED"));
+        registerReceiver(smsReceiver, new IntentFilter("android.provider.Telephony.SMS_RECEIVED"));
 
         // Load all SMS after WebView is ready
-        new Handler().postDelayed(() -> loadAllSMS(), 2000);
+        new Handler().postDelayed(this::loadAllSMS, 2000);
     }
 
     private void setupWebView() {
@@ -104,6 +104,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ---------------- USSD ----------------
+
     private void executeUSSD(String code, int simSlot) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             sendResult("USSD requires Android 8+");
@@ -112,8 +114,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this,
-                        Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            ContextCompat.checkSelfPermission(this,
+                Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
 
             pendingUSSD = code + "|" + simSlot;
 
@@ -175,11 +177,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ---------------- SMS Sending ----------------
+
     private void sendSMSInternal(String number,String message,int simSlot){
         if(ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
                 != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
-                        != PackageManager.PERMISSION_GRANTED){
+           ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED){
 
             pendingSMS = number + "|" + message + "|" + simSlot;
             ActivityCompat.requestPermissions(
@@ -222,6 +226,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ---------------- Display ----------------
+
     private void sendResult(String message){
         String safe = message.replace("\\","\\\\")
                 .replace("'","\\'")
@@ -231,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    // ---------------- SMS Handling ----------------
+    // ---------------- SMS Reading ----------------
 
     private BroadcastReceiver smsReceiver = new BroadcastReceiver() {
         @Override
@@ -264,7 +270,18 @@ public class MainActivity extends AppCompatActivity {
                         "onSMSReceived('"+safeNumber+"','"+safeMessage+"')", null));
     }
 
-    private void loadAllSMS(){
+    private void loadAllSMS() {
+        // Request READ_SMS if not granted
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.READ_SMS},
+                    REQUEST_READ_SMS
+            );
+            return;
+        }
+
         // Read inbox
         try{
             Cursor cursor = getContentResolver().query(
@@ -306,11 +323,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onDestroy(){
-        super.onDestroy();
-        unregisterReceiver(smsReceiver);
-    }
+    // ---------------- Permissions ----------------
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
@@ -337,5 +350,19 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+
+        if(requestCode == REQUEST_READ_SMS){
+            if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+                loadAllSMS(); // reload messages after permission granted
+            } else {
+                sendResult("Permission denied to read SMS");
+            }
+        }
+    }
+
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+        unregisterReceiver(smsReceiver);
     }
 }
