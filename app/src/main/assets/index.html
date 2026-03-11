@@ -5,82 +5,21 @@
 <title>SMS & USSD Dashboard</title>
 
 <style>
-body{
-    margin:0;
-    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
-    background:#0f172a;
-    color:#fff;
-}
-.container{
-    max-width:800px;
-    margin:auto;
-    padding:20px;
-}
+body{ margin:0; font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#0f172a; color:#fff;}
+.container{ max-width:800px; margin:auto; padding:20px;}
 h2{text-align:center;margin-bottom:20px;}
-.tabs{
-    display:flex;
-    justify-content:space-around;
-    margin-bottom:20px;
-    border-bottom:2px solid #334155;
-}
-.tab{
-    padding:10px 20px;
-    cursor:pointer;
-    border-radius:8px 8px 0 0;
-    background:#1e293b;
-    transition:0.2s;
-}
-.tab.active{
-    background:#38bdf8;
-    color:#000;
-}
-.tab:hover{
-    background:#3b82f6;
-    color:#000;
-}
-.card{
-    display:none;
-    background:#1e293b;
-    padding:20px;
-    border-radius:10px;
-}
-.card.active{
-    display:block;
-}
-input,textarea,select{
-    width:100%;
-    padding:10px;
-    margin:8px 0;
-    border-radius:6px;
-    border:none;
-    font-size:16px;
-}
+.tabs{ display:flex; justify-content:space-around; margin-bottom:20px; border-bottom:2px solid #334155;}
+.tab{ padding:10px 20px; cursor:pointer; border-radius:8px 8px 0 0; background:#1e293b; transition:0.2s;}
+.tab.active{ background:#38bdf8; color:#000;}
+.tab:hover{ background:#3b82f6; color:#000;}
+.card{ display:none; background:#1e293b; padding:20px; border-radius:10px;}
+.card.active{ display:block;}
+input,textarea,select{ width:100%; padding:10px; margin:8px 0; border-radius:6px; border:none; font-size:16px;}
 textarea{height:80px;}
-button{
-    width:100%;
-    padding:12px;
-    border:none;
-    border-radius:8px;
-    background:#38bdf8;
-    color:black;
-    font-weight:bold;
-    font-size:16px;
-    cursor:pointer;
-    margin-top:10px;
-}
+button{ width:100%; padding:12px; border:none; border-radius:8px; background:#38bdf8; color:black; font-weight:bold; font-size:16px; cursor:pointer; margin-top:10px;}
 button:hover{background:#0ea5e9;}
-.log{
-    background:#020617;
-    padding:10px;
-    height:250px;
-    overflow:auto;
-    border-radius:8px;
-    font-size:14px;
-}
-.sms{
-    border-bottom:1px solid #334155;
-    padding:6px 0;
-}
+.log{ background:#020617; padding:10px; height:250px; overflow:auto; border-radius:8px; font-size:14px;}
+.sms{ border-bottom:1px solid #334155; padding:6px 0;}
 .inbox{color:#38bdf8;}
 .sent{color:#4ade80;}
 .incoming{color:#facc15;}
@@ -100,7 +39,6 @@ button:hover{background:#0ea5e9;}
     <div class="tab" data-target="incomingCard">Incoming</div>
 </div>
 
-<!-- USSD Panel -->
 <div id="ussdCard" class="card active">
     <h3>Run USSD</h3>
     <input id="ussdCode" placeholder="Enter USSD code e.g *100#">
@@ -113,7 +51,6 @@ button:hover{background:#0ea5e9;}
     <div id="ussdResult" class="log"></div>
 </div>
 
-<!-- Send SMS Panel -->
 <div id="sendCard" class="card">
     <h3>Send SMS</h3>
     <input id="smsNumber" placeholder="Phone number">
@@ -125,19 +62,16 @@ button:hover{background:#0ea5e9;}
     <button onclick="sendSMS()">Send SMS</button>
 </div>
 
-<!-- Inbox Panel -->
 <div id="inboxCard" class="card">
     <h3>Inbox Messages</h3>
     <div id="inboxList" class="log"></div>
 </div>
 
-<!-- Sent Panel -->
 <div id="sentCard" class="card">
     <h3>Sent Messages</h3>
     <div id="sentList" class="log"></div>
 </div>
 
-<!-- Incoming Panel -->
 <div id="incomingCard" class="card">
     <h3>Incoming Live Messages</h3>
     <div id="incomingList" class="log"></div>
@@ -146,7 +80,7 @@ button:hover{background:#0ea5e9;}
 </div>
 
 <script>
-// ---------------- Tabs ----------------
+// Tabs
 const tabs = document.querySelectorAll(".tab");
 tabs.forEach(tab=>{
     tab.addEventListener("click",()=>{
@@ -157,82 +91,75 @@ tabs.forEach(tab=>{
     });
 });
 
-// ---------------- IndexedDB ----------------
+// IndexedDB
 let db;
-function initDB(){
-    let request = indexedDB.open("Messages",1);
-    request.onupgradeneeded = function(event){
-        db = event.target.result;
-        if(!db.objectStoreNames.contains("sms")){
-            let store = db.createObjectStore("sms",{keyPath:"id",autoIncrement:true});
-            store.createIndex("number","number",{unique:false});
-            store.createIndex("type","type",{unique:false});
-            store.createIndex("timestamp","timestamp",{unique:false});
-        }
-    };
-    request.onsuccess = function(event){
-        db = event.target.result;
-        loadAllMessagesFromDB();
-    };
-}
-initDB();
+let request = indexedDB.open("Messages",1);
+request.onupgradeneeded=function(e){
+    db=e.target.result;
+    if(!db.objectStoreNames.contains("sms")){
+        let store=db.createObjectStore("sms",{keyPath:"id",autoIncrement:true});
+        store.createIndex("number","number",{unique:false});
+        store.createIndex("type","type",{unique:false});
+        store.createIndex("timestamp","timestamp",{unique:false});
+    }
+};
+request.onsuccess=function(e){ db=e.target.result; loadAllMessagesFromDB(); };
 
 function storeSMS(number,message,type){
     if(!db) return;
-    let tx = db.transaction("sms","readwrite");
-    let store = tx.objectStore("sms");
-    store.add({number,message,type,timestamp:Date.now()});
+    let tx=db.transaction("sms","readwrite");
+    tx.objectStore("sms").add({number,message,type,timestamp:Date.now()});
 }
 
 function displaySMS(number,message,type){
     storeSMS(number,message,type);
     let box;
-    if(type==="inbox") box = document.getElementById("inboxList");
-    else if(type==="sent") box = document.getElementById("sentList");
-    else if(type==="incoming") box = document.getElementById("incomingList");
-    else if(type==="ussd") box = document.getElementById("ussdResult");
+    if(type==="inbox") box=document.getElementById("inboxList");
+    else if(type==="sent") box=document.getElementById("sentList");
+    else if(type==="incoming") box=document.getElementById("incomingList");
+    else if(type==="ussd") box=document.getElementById("ussdResult");
     if(!box) return;
-    box.innerHTML += `<div class='sms ${type}'><span class='number'>${number}</span><br>${message}</div>`;
-    box.scrollTop = box.scrollHeight;
+    box.innerHTML+=`<div class='sms ${type}'><span class='number'>${number}</span><br>${message}</div>`;
+    box.scrollTop=box.scrollHeight;
 }
 
 function loadAllMessagesFromDB(){
     if(!db) return;
-    let tx = db.transaction("sms","readonly");
-    let store = tx.objectStore("sms");
-    let request = store.openCursor();
-    request.onsuccess = function(event){
-        let cursor = event.target.result;
+    let tx=db.transaction("sms","readonly");
+    let store=tx.objectStore("sms");
+    store.openCursor().onsuccess=function(e){
+        let cursor=e.target.result;
         if(cursor){
-            let m = cursor.value;
+            let m=cursor.value;
             displaySMS(m.number,m.message,m.type);
             cursor.continue();
         }
     };
 }
 
-// ---------------- USSD & SMS ----------------
+// USSD & SMS
 function runUSSD(){
-    let code = document.getElementById("ussdCode").value;
-    let sim = parseInt(document.getElementById("ussdSim").value);
+    let code=document.getElementById("ussdCode").value;
+    let sim=parseInt(document.getElementById("ussdSim").value);
     if(!code){alert("Enter USSD code"); return;}
-    if(typeof AndroidBridge !== "undefined") AndroidBridge.runUssd(code,sim);
+    if(typeof AndroidBridge!=="undefined") AndroidBridge.runUssd(code,sim);
     else displaySMS("SYSTEM","Android bridge not available","ussd");
 }
 function sendSMS(){
-    let number = document.getElementById("smsNumber").value;
-    let message = document.getElementById("smsMessage").value;
-    let sim = parseInt(document.getElementById("smsSim").value);
+    let number=document.getElementById("smsNumber").value;
+    let message=document.getElementById("smsMessage").value;
+    let sim=parseInt(document.getElementById("smsSim").value);
     if(!number || !message){alert("Fill all fields"); return;}
-    if(typeof AndroidBridge !== "undefined") AndroidBridge.sendSMS(number,message,sim);
+    if(typeof AndroidBridge!=="undefined") AndroidBridge.sendSMS(number,message,sim);
     else displaySMS("SYSTEM","Android bridge not available","sent");
 }
-function showResult(msg){ displaySMS("USSD",msg,"ussd"); }
 
-// ---------------- Android Hooks ----------------
+// Android Hooks
+function showResult(msg){ displaySMS("USSD",msg,"ussd"); }
 function onSMSReceived(number,message){ displaySMS(number,message,"incoming"); }
 function onSMSSent(number,message){ displaySMS(number,message,"sent"); }
 function onSMSInbox(number,message){ displaySMS(number,message,"inbox"); }
+
 </script>
 </body>
 </html>
