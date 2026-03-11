@@ -47,13 +47,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Keep the screen on while this activity is running
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         // Initialize WebView
         webView = new WebView(this);
         setContentView(webView);
         setupWebView();
         webView.loadUrl("file:///android_asset/index.html");
 
-        // Start Foreground Service
+        // Start Foreground Service (keeps app running in background)
         Intent serviceIntent = new Intent(this, ForegroundService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
