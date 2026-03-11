@@ -1,80 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Erandix</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #4a90e2, #50e3c2);
-      color: #fff;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 2.5em;
-      margin-bottom: 0.2em;
-    }
-
-    p {
-      font-size: 1.2em;
-      margin: 0.5em 0;
-    }
-
-    #clock {
-      font-size: 2em;
-      margin-top: 1em;
-      font-weight: bold;
-    }
-
-    .card {
-      background: rgba(255,255,255,0.2);
-      padding: 20px;
-      margin: 15px;
-      border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-      width: 80%;
-      max-width: 400px;
-      backdrop-filter: blur(5px);
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Erandix Auto Connect</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f7f7f7; }
+    h1 { text-align: center; color: #333; }
+    #sms-list { max-height: 90vh; overflow-y: auto; background: #fff; padding: 10px; border-radius: 10px; box-shadow: inset 0 0 5px rgba(0,0,0,0.1);}
+    .sms-item { border-bottom: 1px solid #ddd; padding: 5px 0; transition: background 0.5s; }
+    .sms-item.new { background: #d4f0ff; }
+    .sms-number { font-weight: bold; }
+    .sms-message { margin: 3px 0; }
+    .sms-date { font-size: 0.8em; color: #666; }
+</style>
 </head>
 <body>
 
-  <h1>Erandix Connection Auto</h1>
-  <p>Erandix Connection Panel</p>
+<h1>Erandix Messages</h1>
+<div id="sms-list"></div>
 
-  <div class="card">
-    <p><strong>App Version:</strong> 1.0.0</p>
-    <p><strong>Status:</strong> Running in foreground</p>
-    <p><strong>Hotspot:</strong> Enabled if available</p>
-  </div>
+<script>
+// ---------------- IndexedDB Setup ----------------
+let db;
+let request = indexedDB.open('smsDB', 1);
 
-  <div class="card">
-    <p>Enjoy a simple dashboard</p>
-    <p>with live clock below:</p>
-    <div id="clock"></div>
-  </div>
-
-  <script>
-    function updateClock() {
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2,'0');
-      const minutes = String(now.getMinutes()).padStart(2,'0');
-      const seconds = String(now.getSeconds()).padStart(2,'0');
-      document.getElementById('clock').textContent = hours + ":" + minutes + ":" + seconds;
+request.onupgradeneeded = function(e) {
+    db = e.target.result;
+    if (!db.objectStoreNames.contains('sms')) {
+        let store = db.createObjectStore('sms', { keyPath: 'id' });
+        store.createIndex('number', 'number', { unique: false });
     }
+};
 
-    setInterval(updateClock, 1000);
-    updateClock();
-  </script>
+request.onsuccess = function(e) {
+    db = e.target.result;
+    loadSMSFromDB();
+};
 
+request.onerror = function(e) {
+    console.error('IndexedDB error:', e);
+};
+
+// ---------------- Functions ----------------
+function addSmsToIndexedDB(id, number, message, date) {
+    if (!db) return;
+    let tx = db.transaction('sms', 'readwrite');
+    let store = tx.objectStore('sms');
+    store.put({ id, number, message, date });
+    tx.oncomplete = function() { loadSMSFromDB(true, id); }; // pass new id for highlight
+    tx.onerror = function(e) { console.error('DB add error:', e); };
+}
+
+function loadSMSFromDB(highlightNew=false, newId=null) {
+    if (!db) return;
+    let tx = db.transaction('sms', 'readonly');
+    let store = tx.objectStore('sms');
+    let request = store.getAll();
+    request.onsuccess = function(e) {
+        let smsList = e.target.result;
+        smsList.sort((a,b) => a.date - b.date); // oldest first, auto-scroll
+        let container = document.getElementById('sms-list');
+        container.innerHTML = '';
+        smsList.forEach(sms => {
+            let div = document.createElement('div');
+            div.className = 'sms-item';
+            if(highlightNew && sms.id === newId) div.classList.add('new');
+            div.innerHTML = `<div class="sms-number">${sms.number}</div>
+                             <div class="sms-message">${sms.message}</div>
+                             <div class="sms-date">${new Date(sms.date).toLocaleString()}</div>`;
+            container.appendChild(div);
+        });
+        container.scrollTop = container.scrollHeight; 
+
+        if(highlightNew && newId) {
+            let newElem = container.querySelector('.sms-item.new');
+            if(newElem) setTimeout(() => newElem.classList.remove('new'), 2000);
+        }
+    };
+}
+
+function showResult(message) { console.log("USSD/SMS Result:", message); }
+
+function showNewSMS(id, number, message, date) { addSmsToIndexedDB(id, number, message, date); }
+
+// App reload
+function reloadApp() { console.log("Reload app requested from Android"); }
+
+// Open external URL
+function openExternal(url) { window.open(url, "_blank"); }
+
+// Change system bar color
+function setSystemBarsColor(colorString) { console.log("Change system bars color to:", colorString); }
+
+// USSD call (debug)
+function runUssd(code, simSlot) { console.log("Run USSD:", code, "SIM:", simSlot); }
+
+// Send SMS (debug)
+function sendSMS(number, message, simSlot) { console.log("Send SMS:", number, message, "SIM:", simSlot); }
+
+</script>
 </body>
 </html>
