@@ -1,21 +1,213 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>USSD & SMS WebView</title>
-    <script>
-        function displayUSSD(msg) {
-            document.getElementById("ussd").innerText = msg;
-        }
-        function displaySMS(msg) {
-            document.getElementById("sms").innerText = msg;
-        }
-    </script>
-</head>
-<body>
-    <h2>USSD Response:</h2>
-    <div id="ussd">Waiting...</div>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMS / USSD Controller</title>
 
-    <h2>Latest SMS:</h2>
-    <div id="sms">Waiting...</div>
+<style>
+
+body{
+font-family: Arial, sans-serif;
+background:#0f172a;
+color:white;
+margin:0;
+padding:20px;
+}
+
+.container{
+max-width:500px;
+margin:auto;
+}
+
+h2{
+text-align:center;
+margin-bottom:20px;
+}
+
+.card{
+background:#1e293b;
+padding:15px;
+margin-bottom:15px;
+border-radius:10px;
+}
+
+input, textarea, select{
+width:100%;
+padding:10px;
+margin-top:8px;
+margin-bottom:10px;
+border-radius:6px;
+border:none;
+font-size:16px;
+}
+
+textarea{
+height:70px;
+}
+
+button{
+width:100%;
+padding:12px;
+border:none;
+border-radius:8px;
+background:#38bdf8;
+color:black;
+font-weight:bold;
+font-size:16px;
+cursor:pointer;
+}
+
+button:hover{
+background:#0ea5e9;
+}
+
+.log{
+background:#020617;
+padding:10px;
+height:200px;
+overflow:auto;
+border-radius:8px;
+font-size:14px;
+}
+
+.sms{
+border-bottom:1px solid #334155;
+padding:6px 0;
+}
+
+.number{
+color:#38bdf8;
+font-weight:bold;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Android SMS / USSD Panel</h2>
+
+<div class="card">
+
+<h3>Run USSD</h3>
+
+<input id="ussdCode" placeholder="Enter USSD code e.g *100#">
+
+<select id="ussdSim">
+<option value="0">SIM 1</option>
+<option value="1">SIM 2</option>
+</select>
+
+<button onclick="runUSSD()">Run USSD</button>
+
+</div>
+
+
+<div class="card">
+
+<h3>Send SMS</h3>
+
+<input id="smsNumber" placeholder="Phone number">
+
+<textarea id="smsMessage" placeholder="Type your message"></textarea>
+
+<select id="smsSim">
+<option value="0">SIM 1</option>
+<option value="1">SIM 2</option>
+</select>
+
+<button onclick="sendSMS()">Send SMS</button>
+
+</div>
+
+
+<div class="card">
+
+<h3>USSD Result</h3>
+
+<div id="ussdResult" class="log"></div>
+
+</div>
+
+
+<div class="card">
+
+<h3>Incoming SMS</h3>
+
+<div id="smsList" class="log"></div>
+
+</div>
+
+</div>
+
+
+<script>
+
+function runUSSD(){
+
+let code=document.getElementById("ussdCode").value
+let sim=parseInt(document.getElementById("ussdSim").value)
+
+if(!code){
+alert("Enter USSD code")
+return
+}
+
+if(typeof AndroidBridge !== "undefined"){
+AndroidBridge.runUssd(code,sim)
+}else{
+showResult("Android bridge not available")
+}
+
+}
+
+
+function sendSMS(){
+
+let number=document.getElementById("smsNumber").value
+let message=document.getElementById("smsMessage").value
+let sim=parseInt(document.getElementById("smsSim").value)
+
+if(!number || !message){
+alert("Fill all fields")
+return
+}
+
+if(typeof AndroidBridge !== "undefined"){
+AndroidBridge.sendSMS(number,message,sim)
+}else{
+showResult("Android bridge not available")
+}
+
+}
+
+
+function showResult(message){
+
+let box=document.getElementById("ussdResult")
+
+box.innerHTML += "<div>"+message+"</div>"
+
+box.scrollTop = box.scrollHeight
+
+}
+
+
+function onSMSReceived(number,message){
+
+let box=document.getElementById("smsList")
+
+box.innerHTML +=
+"<div class='sms'><span class='number'>"+number+"</span><br>"+message+"</div>"
+
+box.scrollTop = box.scrollHeight
+
+}
+
+</script>
+
 </body>
 </html>
