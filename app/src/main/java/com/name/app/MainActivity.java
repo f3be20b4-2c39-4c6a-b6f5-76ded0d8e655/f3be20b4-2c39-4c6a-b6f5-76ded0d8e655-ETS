@@ -55,19 +55,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Ensure layout exists
         setContentView(R.layout.activity_main);
 
         // Initialize WebView safely
         webView = findViewById(R.id.webview);
         if (webView != null) setupWebView();
-        else Log.e("MainActivity", "WebView not found in layout!");
+        else Log.e("MainActivity", "WebView not found!");
 
-        // Start foreground service (safe)
+        // Start foreground service
         startForegroundServiceSafely();
 
-        // Connect to Wi-Fi
+        // Connect Wi-Fi
         checkAndConnectWifi();
 
         // Request SMS permission and load inbox
@@ -148,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
                 window.setStatusBarColor(color);
                 window.setNavigationBarColor(color);
             }
-            // handle light/dark system bars
+
             boolean isLightColor = isColorLight(color);
             View decorView = window.getDecorView();
             int flags = decorView.getSystemUiVisibility();
@@ -168,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
     // ---------------- USSD ----------------
     private void executeUSSD(String code, int simSlot) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            sendResultToWeb("USSD supported on Android 8.0+ only");
+            sendResultToWeb("USSD requires Android 8.0+");
             return;
         }
 
@@ -183,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         try {
-            SubscriptionManager sm = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+            SubscriptionManager sm = getSystemService(SubscriptionManager.class);
             List<SubscriptionInfo> list = sm.getActiveSubscriptionInfoList();
             if (list == null || list.size() <= simSlot) {
                 sendResultToWeb("Selected SIM not available");
@@ -221,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         try {
-            SubscriptionManager sm = (SubscriptionManager) getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE);
+            SubscriptionManager sm = getSystemService(SubscriptionManager.class);
             List<SubscriptionInfo> list = sm.getActiveSubscriptionInfoList();
             if (list == null || list.size() <= simSlot) {
                 sendResultToWeb("Selected SIM not available");
