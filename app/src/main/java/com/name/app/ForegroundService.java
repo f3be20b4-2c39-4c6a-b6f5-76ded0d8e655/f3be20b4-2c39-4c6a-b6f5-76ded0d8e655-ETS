@@ -30,7 +30,7 @@ public class ForegroundService extends Service {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setContentTitle("Erandix Auto")
                 .setContentText("Monitoring Server...")
-                .setSmallIcon(android.R.drawable.app_icon)
+                .setSmallIcon(R.drawable.app_icon)
                 .setOngoing(true);
 
         startForeground(1, builder.build());
